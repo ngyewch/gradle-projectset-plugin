@@ -11,8 +11,9 @@ import org.gradle.api.provider.Property;
 
 import javax.inject.Inject;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public abstract class ProjectSet {
 
@@ -41,20 +42,24 @@ public abstract class ProjectSet {
     return StringUtils.capitalize(getId().getOrNull());
   }
 
-  public Stream<Project> getResolvedProjects(Project project) {
+  public Set<Project> getResolvedProjects(Project project) {
     return getResolvedProjects(project, JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME);
   }
 
-  public Stream<Project> getResolvedProjects(Project project, String configurationName) {
-    return getResolvedProjectPaths(configurationName).map(project::project);
+  public Set<Project> getResolvedProjects(Project project, String configurationName) {
+    return getResolvedProjectPaths(configurationName).stream()
+        .map(project::project)
+        .collect(Collectors.toSet());
   }
 
-  public Stream<String> getResolvedProjectPaths() {
+  public Set<String> getResolvedProjectPaths() {
     return getResolvedProjectPaths(JavaPlugin.COMPILE_CLASSPATH_CONFIGURATION_NAME);
   }
 
-  public Stream<String> getResolvedProjectPaths(String configurationName) {
-    return getProjects().get().stream()
+  public Set<String> getResolvedProjectPaths(String configurationName) {
+    final Set<String> paths = new HashSet<>();
+    getProjects().get().stream().map(Project::getPath).forEach(paths::add);
+    getProjects().get().stream()
         .map(project -> project.getConfigurations().getByName(configurationName)
             .getResolvedConfiguration().getResolvedArtifacts())
         .flatMap(Collection::stream)
@@ -65,6 +70,8 @@ public abstract class ProjectSet {
           final ProjectComponentIdentifier projectComponentIdentifier = (ProjectComponentIdentifier) resolvedArtifact
               .getId().getComponentIdentifier();
           return projectComponentIdentifier.getProjectPath();
-        });
+        })
+        .forEach(paths::add);
+    return paths;
   }
 }
