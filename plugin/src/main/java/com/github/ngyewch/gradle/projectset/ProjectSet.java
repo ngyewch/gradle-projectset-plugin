@@ -3,6 +3,7 @@ package com.github.ngyewch.gradle.projectset;
 import org.apache.commons.lang3.StringUtils;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.JavaPlugin;
@@ -10,7 +11,6 @@ import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 
 import javax.inject.Inject;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -57,21 +57,35 @@ public abstract class ProjectSet {
   }
 
   public Set<String> getResolvedProjectPaths(String configurationName) {
-    final Set<String> paths = new HashSet<>();
-    getProjects().get().stream().map(Project::getPath).forEach(paths::add);
-    getProjects().get().stream()
-        .map(project -> project.getConfigurations().getByName(configurationName)
-            .getResolvedConfiguration().getResolvedArtifacts())
-        .flatMap(Collection::stream)
-        .collect(Collectors.toSet()).stream()
-        .filter(resolvedArtifact ->
-            resolvedArtifact.getId().getComponentIdentifier() instanceof ProjectComponentIdentifier)
-        .map(resolvedArtifact -> {
+    return new ProjectPathCollector().collect(configurationName);
+  }
+
+  private class ProjectPathCollector {
+
+    private final Set<String> projectPaths = new HashSet<>();
+
+    public Set<String> collect(String configurationName) {
+      for (final Project p : getProjects().get()) {
+        collect(p, configurationName);
+      }
+      return projectPaths;
+    }
+
+    private void collect(Project p, String configurationName) {
+      if (!projectPaths.add(p.getPath())) {
+        return;
+      }
+      for (final ResolvedArtifact resolvedArtifact : p.getConfigurations().getByName(configurationName)
+          .getResolvedConfiguration().getResolvedArtifacts()) {
+        if (resolvedArtifact.getId().getComponentIdentifier() instanceof ProjectComponentIdentifier) {
           final ProjectComponentIdentifier projectComponentIdentifier = (ProjectComponentIdentifier) resolvedArtifact
               .getId().getComponentIdentifier();
-          return projectComponentIdentifier.getProjectPath();
-        })
-        .forEach(paths::add);
-    return paths;
+          final Project p2 = p.findProject(projectComponentIdentifier.getProjectPath());
+          if (p2 != null) {
+            collect(p2, configurationName);
+          }
+        }
+      }
+    }
   }
 }
