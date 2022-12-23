@@ -8,6 +8,7 @@ import org.gradle.api.artifacts.ModuleDependency;
 import org.gradle.api.artifacts.UnknownConfigurationException;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.plugins.JavaBasePlugin;
+import org.gradle.api.plugins.JavaPlatformPlugin;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
@@ -39,7 +40,9 @@ public abstract class ProjectSetTask
 
     projectSet.getResolvedProjects(getProject()).forEach(project -> {
       if (project.getPlugins().hasPlugin(JavaBasePlugin.class)) {
-        setupPublishing(project);
+        setupPublishing(project, "java");
+      } else if (project.getPlugins().hasPlugin(JavaPlatformPlugin.class)) {
+        setupPublishing(project, "javaPlatform");
       }
     });
     setupJavadoc();
@@ -65,6 +68,9 @@ public abstract class ProjectSetTask
                   .getOrElse(new ArrayList<>());
               projectSet.getResolvedProjects(getProject()).forEach(subproject -> {
                 if (excludeProjects.contains(subproject)) {
+                  return;
+                }
+                if (!subproject.getPlugins().hasPlugin(JavaBasePlugin.class)) {
                   return;
                 }
 
@@ -114,11 +120,11 @@ public abstract class ProjectSetTask
     getDependsOn().add(javadocTaskProvider.getName());
   }
 
-  private void setupPublishing(Project project) {
+  private void setupPublishing(Project project, String componentName) {
     project.getExtensions().configure(PublishingExtension.class, publishingExtension -> {
       publishingExtension.publications(publicationContainer -> {
         publicationContainer.create(projectSet.getId().get(), MavenPublication.class, mavenPublication -> {
-          mavenPublication.from(project.getComponents().getByName("java"));
+          mavenPublication.from(project.getComponents().getByName(componentName));
           mavenPublication.setGroupId(project.getGroup().toString());
           mavenPublication.setArtifactId(project.getName());
           mavenPublication.setVersion(project.getVersion().toString());

@@ -3,6 +3,7 @@ package com.github.ngyewch.gradle.projectset;
 import org.apache.commons.lang3.StringUtils;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier;
 import org.gradle.api.model.ObjectFactory;
@@ -12,6 +13,7 @@ import org.gradle.api.provider.Property;
 
 import javax.inject.Inject;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -75,8 +77,14 @@ public abstract class ProjectSet {
       if (!projectPaths.add(p.getPath())) {
         return;
       }
-      for (final ResolvedArtifact resolvedArtifact : p.getConfigurations().getByName(configurationName)
-          .getResolvedConfiguration().getResolvedArtifacts()) {
+      final Optional<Configuration> configurationOptional = p.getConfigurations().stream()
+          .filter(c -> c.getName().equals(configurationName))
+          .findFirst();
+      if (!configurationOptional.isPresent()) {
+        return;
+      }
+      final Configuration configuration = configurationOptional.get();
+      for (final ResolvedArtifact resolvedArtifact : configuration.getResolvedConfiguration().getResolvedArtifacts()) {
         if (resolvedArtifact.getId().getComponentIdentifier() instanceof ProjectComponentIdentifier) {
           final ProjectComponentIdentifier projectComponentIdentifier = (ProjectComponentIdentifier) resolvedArtifact
               .getId().getComponentIdentifier();
